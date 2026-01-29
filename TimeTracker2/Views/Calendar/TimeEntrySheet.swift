@@ -12,7 +12,8 @@ struct TimeEntrySheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var allEntries: [TimeEntry]
-    
+    @Query private var daysOff: [DayOff]
+
     let date: Date
     let tasks: [TrackedTask]
     
@@ -56,6 +57,10 @@ struct TimeEntrySheet: View {
                 Section {
                     Text(dateString)
                         .font(.headline)
+                    Toggle("Day off", isOn: Binding(
+                        get: { isDayOff },
+                        set: { newValue in toggleDayOff(newValue) }
+                    ))
                 }
                 
                 if !entriesForDate.isEmpty {
@@ -168,6 +173,20 @@ struct TimeEntrySheet: View {
         .frame(minWidth: 450, minHeight: 550)
     }
     
+    private var isDayOff: Bool {
+        let calendar = Calendar.current
+        return daysOff.contains { calendar.isDate($0.date, inSameDayAs: date) }
+    }
+
+    private func toggleDayOff(_ on: Bool) {
+        let calendar = Calendar.current
+        if on {
+            modelContext.insert(DayOff(date: calendar.startOfDay(for: date)))
+        } else if let existing = daysOff.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
+            modelContext.delete(existing)
+        }
+    }
+
     private func saveEntry() {
         guard let task = selectedTask else { return }
         
@@ -427,5 +446,5 @@ struct NewTaskSheet: View {
 
 #Preview {
     TimeEntrySheet(date: Date(), tasks: [])
-        .modelContainer(for: [TrackedTask.self, TimeEntry.self], inMemory: true)
+        .modelContainer(for: [TrackedTask.self, TimeEntry.self, DayOff.self], inMemory: true)
 }

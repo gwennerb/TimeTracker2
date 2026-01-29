@@ -14,6 +14,7 @@ struct TimeTracker2App: App {
         let schema = Schema([
             TrackedTask.self,
             TimeEntry.self,
+            DayOff.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

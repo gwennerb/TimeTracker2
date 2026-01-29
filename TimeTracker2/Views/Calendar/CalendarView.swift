@@ -12,6 +12,7 @@ struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var entries: [TimeEntry]
     @Query(filter: #Predicate<TrackedTask> { !$0.isArchived }) private var tasks: [TrackedTask]
+    @Query private var daysOff: [DayOff]
     
     @State private var viewModel = CalendarViewModel()
     
@@ -79,20 +80,41 @@ struct CalendarView: View {
         .padding(.horizontal, 4)
     }
     
+    private func isDayOff(_ date: Date) -> Bool {
+        let calendar = Calendar.current
+        return daysOff.contains { calendar.isDate($0.date, inSameDayAs: date) }
+    }
+
+    private func toggleDayOff(_ date: Date) {
+        let calendar = Calendar.current
+        if let existing = daysOff.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
+            modelContext.delete(existing)
+        } else {
+            modelContext.insert(DayOff(date: calendar.startOfDay(for: date)))
+        }
+    }
+
     private var calendarGrid: some View {
         LazyVGrid(columns: columns, spacing: 4) {
             ForEach(viewModel.currentMonthDates, id: \.self) { date in
                 let hours = viewModel.totalHoursForDate(date, entries: entries)
+                let dayOff = isDayOff(date)
                 DayCell(
                     date: date,
                     isCurrentMonth: viewModel.isCurrentMonth(date),
                     isToday: viewModel.isToday(date),
-                    isIncomplete: viewModel.isCurrentMonth(date) && viewModel.isIncompleteWeekday(date, totalHours: hours),
+                    isIncomplete: viewModel.isCurrentMonth(date) && !dayOff && viewModel.isIncompleteWeekday(date, totalHours: hours),
+                    isDayOff: dayOff,
                     dayNumber: viewModel.dayNumber(date),
                     categories: viewModel.categoriesForDate(date, entries: entries),
                     totalHours: hours
                 ) {
                     viewModel.selectDay(date)
+                }
+                .contextMenu {
+                    Button(dayOff ? "Remove Day Off" : "Mark as Day Off") {
+                        toggleDayOff(date)
+                    }
                 }
             }
         }
@@ -106,6 +128,7 @@ struct DayCell: View {
     let isCurrentMonth: Bool
     let isToday: Bool
     let isIncomplete: Bool
+    let isDayOff: Bool
     let dayNumber: String
     let categories: Set<TaskCategory>
     let totalHours: Double
@@ -139,7 +162,11 @@ struct DayCell: View {
                     }
                 }
                 
-                if totalHours > 0 {
+                if isDayOff {
+                    Image(systemName: "moon.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green.opacity(0.7))
+                } else if totalHours > 0 {
                     Text(String(format: "%.1fh", totalHours))
                         .font(.caption2)
                         .foregroundStyle(isIncomplete && !isToday ? .orange : .secondary)
@@ -155,6 +182,9 @@ struct DayCell: View {
                 if isToday {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.blue)
+                } else if isDayOff {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.green.opacity(0.12))
                 } else if isIncomplete {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.orange.opacity(0.12))
@@ -170,5 +200,5 @@ struct DayCell: View {
 
 #Preview {
     CalendarView()
-        .modelContainer(for: [TrackedTask.self, TimeEntry.self], inMemory: true)
+        .modelContainer(for: [TrackedTask.self, TimeEntry.self, DayOff.self], inMemory: true)
 }
