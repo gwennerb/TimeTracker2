@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		370363C42EE455BF00B74ABA /* TimeTracker2.icon in Resources */ = {isa = PBXBuildFile; fileRef = 370363C32EE455BF00B74ABA /* TimeTracker2.icon */; };
+		370363C52EE455BF00B74ABA /* TimeTracker2.icon in Resources */ = {isa = PBXBuildFile; fileRef = 370363C32EE455BF00B74ABA /* TimeTracker2.icon */; };
+		370363C62EE455BF00B74ABA /* TimeTracker2.icon in Resources */ = {isa = PBXBuildFile; fileRef = 370363C32EE455BF00B74ABA /* TimeTracker2.icon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3703636D2EE4319000B74ABA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +33,7 @@
 		3703635F2EE4318E00B74ABA /* TimeTracker2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimeTracker2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3703636C2EE4319000B74ABA /* TimeTracker2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimeTracker2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		370363762EE4319000B74ABA /* TimeTracker2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimeTracker2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		370363C32EE455BF00B74ABA /* TimeTracker2.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = TimeTracker2.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +82,7 @@
 		370363562EE4318E00B74ABA = {
 			isa = PBXGroup;
 			children = (
+				370363C32EE455BF00B74ABA /* TimeTracker2.icon */,
 				370363612EE4318E00B74ABA /* TimeTracker2 */,
 				3703636F2EE4319000B74ABA /* TimeTracker2Tests */,
 				370363792EE4319000B74ABA /* TimeTracker2UITests */,
@@ -212,6 +220,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				370363C62EE455BF00B74ABA /* TimeTracker2.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -219,6 +228,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				370363C42EE455BF00B74ABA /* TimeTracker2.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,6 +236,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				370363C52EE455BF00B74ABA /* TimeTracker2.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -390,8 +401,9 @@
 		370363812EE4319000B74ABA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TimeTracker2;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -420,8 +432,9 @@
 		370363822EE4319000B74ABA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TimeTracker2;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
