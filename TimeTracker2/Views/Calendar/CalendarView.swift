@@ -82,13 +82,15 @@ struct CalendarView: View {
     private var calendarGrid: some View {
         LazyVGrid(columns: columns, spacing: 4) {
             ForEach(viewModel.currentMonthDates, id: \.self) { date in
+                let hours = viewModel.totalHoursForDate(date, entries: entries)
                 DayCell(
                     date: date,
                     isCurrentMonth: viewModel.isCurrentMonth(date),
                     isToday: viewModel.isToday(date),
+                    isIncomplete: viewModel.isCurrentMonth(date) && viewModel.isIncompleteWeekday(date, totalHours: hours),
                     dayNumber: viewModel.dayNumber(date),
                     categories: viewModel.categoriesForDate(date, entries: entries),
-                    totalHours: viewModel.totalHoursForDate(date, entries: entries)
+                    totalHours: hours
                 ) {
                     viewModel.selectDay(date)
                 }
@@ -103,6 +105,7 @@ struct DayCell: View {
     let date: Date
     let isCurrentMonth: Bool
     let isToday: Bool
+    let isIncomplete: Bool
     let dayNumber: String
     let categories: Set<TaskCategory>
     let totalHours: Double
@@ -139,7 +142,11 @@ struct DayCell: View {
                 if totalHours > 0 {
                     Text(String(format: "%.1fh", totalHours))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isIncomplete && !isToday ? .orange : .secondary)
+                } else if isIncomplete {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange.opacity(0.7))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -148,6 +155,9 @@ struct DayCell: View {
                 if isToday {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.blue)
+                } else if isIncomplete {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.orange.opacity(0.12))
                 } else if isCurrentMonth {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.ultraThinMaterial)

@@ -95,6 +95,14 @@ final class CalendarViewModel {
         entriesForDate(date, entries: entries).reduce(0) { $0 + $1.duration }
     }
     
+    func isIncompleteWeekday(_ date: Date, totalHours: Double) -> Bool {
+        let weekday = calendar.component(.weekday, from: date)
+        // Sunday = 1, Saturday = 7
+        guard weekday >= 2 && weekday <= 6 else { return false }
+        guard calendar.isDateInToday(date) || date < calendar.startOfDay(for: Date()) else { return false }
+        return totalHours < 8
+    }
+
     func categoriesForDate(_ date: Date, entries: [TimeEntry]) -> Set<TaskCategory> {
         let dayEntries = entriesForDate(date, entries: entries)
         return Set(dayEntries.compactMap { $0.task?.category })
