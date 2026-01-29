@@ -97,6 +97,11 @@ struct TimeEntrySheet: View {
                                 selectedTask = task
                             }
                         }
+                        Button {
+                            showingNewTaskSheet = true
+                        } label: {
+                            Label("Create New Task", systemImage: "plus.circle")
+                        }
                     }
                 }
                 
