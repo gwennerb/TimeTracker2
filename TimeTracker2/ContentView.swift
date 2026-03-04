@@ -12,6 +12,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
     case tasks = "Tasks"
     case summary = "Summary"
+    case settings = "Settings"
 
     var id: String { rawValue }
 
@@ -23,6 +24,8 @@ enum AppTab: String, CaseIterable, Identifiable {
             return "list.bullet"
         case .summary:
             return "chart.bar.fill"
+        case .settings:
+            return "bell.badge"
         }
     }
 }
@@ -41,6 +44,8 @@ struct ContentView: View {
                     TasksView()
                 case .summary:
                     SummaryView()
+                case .settings:
+                    ReminderSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

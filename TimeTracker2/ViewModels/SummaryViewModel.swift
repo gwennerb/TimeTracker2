@@ -75,4 +75,57 @@ final class SummaryViewModel {
         
         return taskHours.values.sorted { $0.hours > $1.hours }
     }
+    
+    func exportText(for entries: [TimeEntry]) -> String {
+        let monthEntries = entriesForMonth(entries)
+        var lines: [String] = []
+        
+        lines.append("TimeTracker Summary - \(monthYearString)")
+        lines.append("Total Hours: \(formattedHours(totalHoursForMonth(entries)))h")
+        lines.append("")
+        
+        if monthEntries.isEmpty {
+            lines.append("No entries logged for this month.")
+            return lines.joined(separator: "\n")
+        }
+        
+        lines.append("Category Totals:")
+        for category in TaskCategory.allCases {
+            let categoryHours = totalHoursForCategory(category, entries: entries)
+            guard categoryHours > 0 else { continue }
+            
+            lines.append("- \(category.displayName): \(formattedHours(categoryHours))h")
+            for item in taskHoursForCategory(category, entries: entries) {
+                lines.append("  - \(item.task.name): \(formattedHours(item.hours))h")
+            }
+        }
+        
+        lines.append("")
+        lines.append("Entries:")
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        let sortedEntries = monthEntries.sorted { lhs, rhs in
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+            return (lhs.task?.name ?? "No Task").localizedCaseInsensitiveCompare(rhs.task?.name ?? "No Task") == .orderedAscending
+        }
+        
+        for entry in sortedEntries {
+            let taskName = entry.task?.name ?? "No Task"
+            let categoryName = entry.task?.category.displayName ?? "Uncategorized"
+            let notes = entry.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let notesText = notes.isEmpty ? "-" : notes.replacingOccurrences(of: "\n", with: " ")
+            
+            lines.append("- \(dateFormatter.string(from: entry.date)) | \(categoryName) | \(taskName) | \(formattedHours(entry.duration))h | Notes: \(notesText)")
+        }
+        
+        return lines.joined(separator: "\n")
+    }
+    
+    private func formattedHours(_ value: Double) -> String {
+        String(format: "%.1f", value)
+    }
 }

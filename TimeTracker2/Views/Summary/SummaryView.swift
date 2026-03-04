@@ -7,12 +7,16 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct SummaryView: View {
     @Query private var entries: [TimeEntry]
     
     @State private var viewModel = SummaryViewModel()
     @State private var expandedCategories: Set<TaskCategory> = Set(TaskCategory.allCases)
+    @State private var exportStatusMessage: String?
+    @State private var isExporting = false
+    @State private var exportDocument = SummaryTextDocument(text: "")
     
     var body: some View {
         ScrollView {
@@ -27,6 +31,30 @@ struct SummaryView: View {
                 categoryCards
             }
             .padding()
+        }
+        .alert("Summary Export", isPresented: Binding(
+            get: { exportStatusMessage != nil },
+            set: { if !$0 { exportStatusMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(exportStatusMessage ?? "")
+        }
+        .fileExporter(
+            isPresented: $isExporting,
+            document: exportDocument,
+            contentType: .plainText,
+            defaultFilename: defaultExportFileName
+        ) { result in
+            switch result {
+            case .success(let url):
+                exportStatusMessage = "Summary exported to \(url.lastPathComponent)."
+            case .failure(let error):
+                if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
+                    return
+                }
+                exportStatusMessage = "Export failed: \(error.localizedDescription)"
+            }
         }
     }
     
@@ -49,6 +77,11 @@ struct SummaryView: View {
             Button(action: viewModel.nextMonth) {
                 Image(systemName: "chevron.right")
                     .font(.title2)
+            }
+            .buttonStyle(.plain)
+            
+            Button(action: exportSummary) {
+                Label("Export", systemImage: "square.and.arrow.up")
             }
             .buttonStyle(.plain)
         }
@@ -102,6 +135,42 @@ struct SummaryView: View {
                 expandedCategories.insert(category)
             }
         }
+    }
+    
+    private func exportSummary() {
+        exportDocument = SummaryTextDocument(text: viewModel.exportText(for: entries))
+        isExporting = true
+    }
+    
+    private var defaultExportFileName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        return "Summary-\(formatter.string(from: viewModel.selectedMonth)).txt"
+    }
+}
+
+private struct SummaryTextDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    
+    var text: String
+    
+    init(text: String) {
+        self.text = text
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let text = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.text = text
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let data = text.data(using: .utf8) else {
+            throw CocoaError(.fileWriteInapplicableStringEncoding)
+        }
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 

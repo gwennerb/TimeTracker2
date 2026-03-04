@@ -28,7 +28,14 @@ struct TimeTracker2App: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    await ReminderScheduler.syncFromPreferences()
+                }
         }
         .modelContainer(sharedModelContainer)
+
+        Settings {
+            ReminderSettingsView()
+        }
     }
 }
