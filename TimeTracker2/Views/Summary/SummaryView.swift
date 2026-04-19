@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import AppKit
 
 struct SummaryView: View {
     @Query private var entries: [TimeEntry]
@@ -94,6 +95,11 @@ struct SummaryView: View {
             Button(action: viewModel.nextMonth) {
                 Image(systemName: "chevron.right")
                     .font(.title2)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: copyForDiscord) {
+                Label("Copy for Discord", systemImage: "doc.on.clipboard")
             }
             .buttonStyle(.plain)
 
@@ -247,6 +253,17 @@ struct SummaryView: View {
     private func exportSummary() {
         exportDocument = SummaryTextDocument(text: viewModel.exportText(for: entries))
         isExporting = true
+    }
+
+    private func copyForDiscord() {
+        let text = viewModel.discordExportText(
+            for: entries,
+            expectedHours: viewModel.expectedHoursForMonth(daysOff)
+        )
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        exportStatusMessage = "Copied to clipboard. Paste into Discord."
     }
 
     private var defaultExportFileName: String {

@@ -10,6 +10,7 @@ import SwiftData
 
 enum AppTab: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
+    case quickEntry = "Quick Entry"
     case tasks = "Tasks"
     case projects = "Projects"
     case summary = "Summary"
@@ -21,6 +22,8 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .calendar:
             return "calendar"
+        case .quickEntry:
+            return "square.grid.3x3"
         case .tasks:
             return "list.bullet"
         case .projects:
@@ -43,6 +46,8 @@ struct ContentView: View {
                 switch selectedTab {
                 case .calendar:
                     CalendarView()
+                case .quickEntry:
+                    QuickEntryView()
                 case .tasks:
                     TasksView()
                 case .projects:

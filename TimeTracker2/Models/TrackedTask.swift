@@ -30,4 +30,21 @@ final class TrackedTask {
         self.isArchived = isArchived
         self.entries = []
     }
+
+    var lastUsedDate: Date? {
+        entries.map(\.date).max()
+    }
+}
+
+extension Array where Element == TrackedTask {
+    /// Sort by most-recently-used desc, then entry count desc, then name.
+    func sortedByRecency() -> [TrackedTask] {
+        sorted { lhs, rhs in
+            let l = lhs.lastUsedDate ?? .distantPast
+            let r = rhs.lastUsedDate ?? .distantPast
+            if l != r { return l > r }
+            if lhs.entries.count != rhs.entries.count { return lhs.entries.count > rhs.entries.count }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
 }

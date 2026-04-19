@@ -291,4 +291,142 @@ final class SummaryViewModel {
     private func formattedHours(_ value: Double) -> String {
         String(format: "%.1f", value)
     }
+
+    func discordExportText(for entries: [TimeEntry], expectedHours: Double) -> String {
+        if let project = selectedProject {
+            return discordTextForProject(project, entries: entries)
+        }
+        return discordTextForAllProjects(entries: entries, expectedHours: expectedHours)
+    }
+
+    private func discordTextForAllProjects(entries: [TimeEntry], expectedHours: Double) -> String {
+        let monthEntries = entriesForMonth(entries)
+        let total = monthEntries.reduce(0.0) { $0 + $1.duration }
+
+        var header: [String] = []
+        header.append("**TimeTracker — \(monthYearString)**")
+        header.append("Total: \(formattedHours(total))h  |  Expected: \(formattedHours(expectedHours))h")
+
+        if monthEntries.isEmpty {
+            header.append("_No entries logged for this month._")
+            return header.joined(separator: "\n")
+        }
+
+        let projects = projectsWithEntriesInMonth(entries)
+        let unassigned = monthEntries.filter { $0.project == nil }
+        let unassignedHours = unassigned.reduce(0.0) { $0 + $1.duration }
+
+        var rows: [(String, Double)] = projects.map { ($0.name, totalHoursForProject($0, entries: entries)) }
+        if unassignedHours > 0 {
+            rows.append(("(Unassigned)", unassignedHours))
+        }
+
+        let table = formatTwoColumnTable(
+            headers: ("Project", "Hours"),
+            rows: rows.map { ($0.0, formattedHours($0.1) + "h") },
+            totalRow: ("TOTAL", formattedHours(total) + "h")
+        )
+
+        return (header + ["```", table, "```"]).joined(separator: "\n")
+    }
+
+    private func discordTextForProject(_ project: Project, entries: [TimeEntry]) -> String {
+        let projectTotal = totalHoursForProject(project, entries: entries)
+        var header: [String] = []
+        header.append("**TimeTracker — \(monthYearString) — \(project.name)**")
+        header.append("Total: \(formattedHours(projectTotal))h")
+
+        let previousSelection = selectedProject
+        selectedProject = project
+        defer { selectedProject = previousSelection }
+
+        var rows: [(category: String, task: String, hours: Double)] = []
+        for category in TaskCategory.allCases {
+            for item in taskHoursForCategory(category, entries: entries) {
+                rows.append((category.displayName, item.task.name, item.hours))
+            }
+        }
+
+        if rows.isEmpty {
+            header.append("_No entries logged for this project this month._")
+            return header.joined(separator: "\n")
+        }
+
+        let maxRows = 20
+        var truncatedNote: String?
+        if rows.count > maxRows {
+            let kept = rows.prefix(maxRows)
+            truncatedNote = "… and \(rows.count - maxRows) more rows"
+            rows = Array(kept)
+        }
+
+        let table = formatThreeColumnTable(
+            headers: ("Category", "Task", "Hours"),
+            rows: rows.map { ($0.category, $0.task, formattedHours($0.hours) + "h") },
+            totalRow: ("TOTAL", "", formattedHours(projectTotal) + "h"),
+            footer: truncatedNote
+        )
+
+        return (header + ["```", table, "```"]).joined(separator: "\n")
+    }
+
+    private func formatTwoColumnTable(
+        headers: (String, String),
+        rows: [(String, String)],
+        totalRow: (String, String)
+    ) -> String {
+        let allLeft = [headers.0] + rows.map { $0.0 } + [totalRow.0]
+        let allRight = [headers.1] + rows.map { $0.1 } + [totalRow.1]
+        let leftWidth = allLeft.map { $0.count }.max() ?? 0
+        let rightWidth = allRight.map { $0.count }.max() ?? 0
+        let totalWidth = leftWidth + 2 + rightWidth
+        let divider = String(repeating: "─", count: totalWidth)
+
+        var lines: [String] = []
+        lines.append(padRight(headers.0, leftWidth) + "  " + padLeft(headers.1, rightWidth))
+        lines.append(divider)
+        for row in rows {
+            lines.append(padRight(row.0, leftWidth) + "  " + padLeft(row.1, rightWidth))
+        }
+        lines.append(divider)
+        lines.append(padRight(totalRow.0, leftWidth) + "  " + padLeft(totalRow.1, rightWidth))
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatThreeColumnTable(
+        headers: (String, String, String),
+        rows: [(String, String, String)],
+        totalRow: (String, String, String),
+        footer: String?
+    ) -> String {
+        let allCol1 = [headers.0] + rows.map { $0.0 } + [totalRow.0]
+        let allCol2 = [headers.1] + rows.map { $0.1 } + [totalRow.1]
+        let allCol3 = [headers.2] + rows.map { $0.2 } + [totalRow.2]
+        let w1 = allCol1.map { $0.count }.max() ?? 0
+        let w2 = allCol2.map { $0.count }.max() ?? 0
+        let w3 = allCol3.map { $0.count }.max() ?? 0
+        let totalWidth = w1 + 2 + w2 + 2 + w3
+        let divider = String(repeating: "─", count: totalWidth)
+
+        var lines: [String] = []
+        lines.append(padRight(headers.0, w1) + "  " + padRight(headers.1, w2) + "  " + padLeft(headers.2, w3))
+        lines.append(divider)
+        for row in rows {
+            lines.append(padRight(row.0, w1) + "  " + padRight(row.1, w2) + "  " + padLeft(row.2, w3))
+        }
+        lines.append(divider)
+        lines.append(padRight(totalRow.0, w1) + "  " + padRight(totalRow.1, w2) + "  " + padLeft(totalRow.2, w3))
+        if let footer {
+            lines.append(footer)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func padRight(_ s: String, _ width: Int) -> String {
+        s.count >= width ? s : s + String(repeating: " ", count: width - s.count)
+    }
+
+    private func padLeft(_ s: String, _ width: Int) -> String {
+        s.count >= width ? s : String(repeating: " ", count: width - s.count) + s
+    }
 }

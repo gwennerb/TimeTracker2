@@ -28,6 +28,7 @@ struct TimeEntrySheet: View {
     @State private var showingNewProjectSheet: Bool = false
     @State private var entryToEdit: TimeEntry?
     @State private var showingEditSheet: Bool = false
+    @State private var showingRepeatConfirmation: Bool = false
 
     private var entriesForDate: [TimeEntry] {
         let calendar = Calendar.current
@@ -49,7 +50,7 @@ struct TimeEntrySheet: View {
             filtered = filtered.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
 
-        return filtered.sorted { $0.entries.count > $1.entries.count }
+        return filtered.sortedByRecency()
     }
 
     private var dateString: String {
@@ -175,6 +176,21 @@ struct TimeEntrySheet: View {
                     }
                 }
 
+                if mostRecentPriorDay != nil {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            if entriesForDate.isEmpty {
+                                performRepeatPreviousDay()
+                            } else {
+                                showingRepeatConfirmation = true
+                            }
+                        } label: {
+                            Label("Repeat Previous Day", systemImage: "arrow.clockwise")
+                        }
+                        .help("Duplicate entries from the most recent prior day with logged time")
+                    }
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add Entry") {
                         saveEntry()
@@ -197,8 +213,24 @@ struct TimeEntrySheet: View {
                     EditEntrySheet(entry: entry, tasks: tasks)
                 }
             }
+            .confirmationDialog(
+                "This day already has \(entriesForDate.count) entr\(entriesForDate.count == 1 ? "y" : "ies"). Append the previous day's entries on top?",
+                isPresented: $showingRepeatConfirmation
+            ) {
+                Button("Append") { performRepeatPreviousDay() }
+                Button("Cancel", role: .cancel) {}
+            }
         }
         .frame(minWidth: 450, minHeight: 550)
+    }
+
+    private var mostRecentPriorDay: Date? {
+        EntryDuplicator.mostRecentPriorDay(before: date, in: allEntries)
+    }
+
+    private func performRepeatPreviousDay() {
+        guard let source = mostRecentPriorDay else { return }
+        EntryDuplicator.duplicateDay(from: source, to: date, among: allEntries, in: modelContext)
     }
 
     private var isDayOff: Bool {
@@ -305,7 +337,7 @@ struct EditEntrySheet: View {
     @State private var showingDeleteConfirmation: Bool = false
 
     private var editableTaskList: [TrackedTask] {
-        var list = tasks.filter { !$0.isArchived }
+        var list = tasks.filter { !$0.isArchived }.sortedByRecency()
         if let current = entry.task, current.isArchived, !list.contains(where: { $0.id == current.id }) {
             list.insert(current, at: 0)
         }
