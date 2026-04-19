@@ -15,6 +15,7 @@ struct TimeTracker2App: App {
             TrackedTask.self,
             TimeEntry.self,
             DayOff.self,
+            Project.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -29,6 +30,7 @@ struct TimeTracker2App: App {
         WindowGroup {
             ContentView()
                 .task {
+                    ProjectMigration.ensureSeed(sharedModelContainer.mainContext)
                     await ReminderScheduler.syncFromPreferences()
                 }
         }

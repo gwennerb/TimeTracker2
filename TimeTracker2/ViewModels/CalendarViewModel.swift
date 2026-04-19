@@ -100,7 +100,12 @@ final class CalendarViewModel {
         // Sunday = 1, Saturday = 7
         guard weekday >= 2 && weekday <= 6 else { return false }
         guard calendar.isDateInToday(date) || date < calendar.startOfDay(for: Date()) else { return false }
+        guard SwedishHolidays.holiday(for: date, calendar: calendar) == nil else { return false }
         return totalHours < 8
+    }
+
+    func holidayName(for date: Date) -> String? {
+        SwedishHolidays.holiday(for: date, calendar: calendar)?.name
     }
 
     func categoriesForDate(_ date: Date, entries: [TimeEntry]) -> Set<TaskCategory> {

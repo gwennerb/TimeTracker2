@@ -11,6 +11,7 @@ import SwiftData
 enum AppTab: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
     case tasks = "Tasks"
+    case projects = "Projects"
     case summary = "Summary"
     case settings = "Settings"
 
@@ -22,6 +23,8 @@ enum AppTab: String, CaseIterable, Identifiable {
             return "calendar"
         case .tasks:
             return "list.bullet"
+        case .projects:
+            return "folder"
         case .summary:
             return "chart.bar.fill"
         case .settings:
@@ -42,6 +45,8 @@ struct ContentView: View {
                     CalendarView()
                 case .tasks:
                     TasksView()
+                case .projects:
+                    ProjectsView()
                 case .summary:
                     SummaryView()
                 case .settings:

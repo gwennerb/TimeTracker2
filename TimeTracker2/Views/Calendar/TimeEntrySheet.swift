@@ -13,24 +13,31 @@ struct TimeEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var allEntries: [TimeEntry]
     @Query private var daysOff: [DayOff]
+    @Query(sort: \Project.name) private var allProjects: [Project]
 
     let date: Date
     let tasks: [TrackedTask]
-    
+
     @State private var selectedTask: TrackedTask?
+    @State private var selectedProject: Project?
     @State private var duration: Double = 1.0
     @State private var notes: String = ""
     @State private var searchText: String = ""
     @State private var selectedCategory: TaskCategory?
     @State private var showingNewTaskSheet: Bool = false
+    @State private var showingNewProjectSheet: Bool = false
     @State private var entryToEdit: TimeEntry?
     @State private var showingEditSheet: Bool = false
-    
+
     private var entriesForDate: [TimeEntry] {
         let calendar = Calendar.current
         return allEntries.filter { calendar.isDate($0.date, inSameDayAs: date) }
     }
-    
+
+    private var activeProjects: [Project] {
+        allProjects.filter { !$0.isArchived }
+    }
+
     private var filteredTasks: [TrackedTask] {
         var filtered = tasks.filter { !$0.isArchived }
 
@@ -44,13 +51,13 @@ struct TimeEntrySheet: View {
 
         return filtered.sorted { $0.entries.count > $1.entries.count }
     }
-    
+
     private var dateString: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .full
         return formatter.string(from: date)
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -62,7 +69,7 @@ struct TimeEntrySheet: View {
                         set: { newValue in toggleDayOff(newValue) }
                     ))
                 }
-                
+
                 if !entriesForDate.isEmpty {
                     Section("Logged Time") {
                         ForEach(entriesForDate) { entry in
@@ -74,8 +81,24 @@ struct TimeEntrySheet: View {
                         .onDelete(perform: deleteEntries)
                     }
                 }
-                
+
                 Section("Add New Entry") {
+                    HStack {
+                        Picker("Project", selection: $selectedProject) {
+                            Text("Select project…").tag(nil as Project?)
+                            ForEach(activeProjects) { project in
+                                Text(project.name).tag(project as Project?)
+                            }
+                        }
+                        Button {
+                            showingNewProjectSheet = true
+                        } label: {
+                            Image(systemName: "plus.circle")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Create new project")
+                    }
+
                     Picker("Category", selection: $selectedCategory) {
                         Text("All Categories").tag(nil as TaskCategory?)
                         ForEach(TaskCategory.allCases) { category in
@@ -83,9 +106,9 @@ struct TimeEntrySheet: View {
                                 .tag(category as TaskCategory?)
                         }
                     }
-                    
+
                     TextField("Search tasks...", text: $searchText)
-                    
+
                     if filteredTasks.isEmpty {
                         ContentUnavailableView {
                             Label("No Tasks", systemImage: "tray")
@@ -109,7 +132,7 @@ struct TimeEntrySheet: View {
                         }
                     }
                 }
-                
+
                 if selectedTask != nil {
                     Section("Time") {
                         HStack {
@@ -120,7 +143,7 @@ struct TimeEntrySheet: View {
                                 .frame(width: 80)
                                 .multilineTextAlignment(.trailing)
                         }
-                        
+
                         HStack(spacing: 8) {
                             ForEach([0.5, 1.0, 2.0, 4.0, 8.0], id: \.self) { hours in
                                 Button(String(format: hours == floor(hours) ? "%.0fh" : "%.1fh", hours)) {
@@ -130,7 +153,7 @@ struct TimeEntrySheet: View {
                             }
                         }
                     }
-                    
+
                     Section("Notes") {
                         TextEditor(text: $notes)
                             .frame(minHeight: 60)
@@ -145,23 +168,28 @@ struct TimeEntrySheet: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Task") {
                         showingNewTaskSheet = true
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add Entry") {
                         saveEntry()
                     }
-                    .disabled(selectedTask == nil || duration <= 0)
+                    .disabled(selectedTask == nil || selectedProject == nil || duration <= 0)
                 }
             }
             .sheet(isPresented: $showingNewTaskSheet) {
                 NewTaskSheet { newTask in
                     selectedTask = newTask
+                }
+            }
+            .sheet(isPresented: $showingNewProjectSheet) {
+                NewProjectSheet { newProject in
+                    selectedProject = newProject
                 }
             }
             .sheet(isPresented: $showingEditSheet) {
@@ -172,7 +200,7 @@ struct TimeEntrySheet: View {
         }
         .frame(minWidth: 450, minHeight: 550)
     }
-    
+
     private var isDayOff: Bool {
         let calendar = Calendar.current
         return daysOff.contains { calendar.isDate($0.date, inSameDayAs: date) }
@@ -188,16 +216,16 @@ struct TimeEntrySheet: View {
     }
 
     private func saveEntry() {
-        guard let task = selectedTask else { return }
-        
-        let entry = TimeEntry(date: date, duration: duration, notes: notes, task: task)
+        guard let task = selectedTask, let project = selectedProject else { return }
+
+        let entry = TimeEntry(date: date, duration: duration, notes: notes, task: task, project: project)
         modelContext.insert(entry)
-        
+
         selectedTask = nil
         duration = 1.0
         notes = ""
     }
-    
+
     private func deleteEntries(at offsets: IndexSet) {
         for index in offsets {
             let entry = entriesForDate[index]
@@ -208,19 +236,31 @@ struct TimeEntrySheet: View {
 
 struct ExistingEntryRow: View {
     let entry: TimeEntry
+
     let onEdit: () -> Void
-    
+
     var body: some View {
         Button(action: onEdit) {
             HStack {
                 if let task = entry.task {
                     Image(systemName: task.category.icon)
                         .foregroundStyle(task.category.color)
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(task.name)
-                            .font(.body)
-                        
+                        HStack(spacing: 6) {
+                            Text(task.name)
+                                .font(.body)
+
+                            if let project = entry.project {
+                                Text(project.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(.quaternary, in: Capsule())
+                            }
+                        }
+
                         if !entry.notes.isEmpty {
                             Text(entry.notes)
                                 .font(.caption)
@@ -232,14 +272,14 @@ struct ExistingEntryRow: View {
                     Text("Unknown Task")
                         .foregroundStyle(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Text(String(format: "%.1fh", entry.duration))
                     .font(.body)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -253,18 +293,28 @@ struct ExistingEntryRow: View {
 struct EditEntrySheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+    @Query(sort: \Project.name) private var allProjects: [Project]
+
     let entry: TimeEntry
     let tasks: [TrackedTask]
-    
+
     @State private var selectedTask: TrackedTask?
+    @State private var selectedProject: Project?
     @State private var duration: Double
     @State private var notes: String
     @State private var showingDeleteConfirmation: Bool = false
-    
+
     private var editableTaskList: [TrackedTask] {
         var list = tasks.filter { !$0.isArchived }
         if let current = entry.task, current.isArchived, !list.contains(where: { $0.id == current.id }) {
+            list.insert(current, at: 0)
+        }
+        return list
+    }
+
+    private var editableProjectList: [Project] {
+        var list = allProjects.filter { !$0.isArchived }
+        if let current = entry.project, current.isArchived, !list.contains(where: { $0.id == current.id }) {
             list.insert(current, at: 0)
         }
         return list
@@ -274,13 +324,23 @@ struct EditEntrySheet: View {
         self.entry = entry
         self.tasks = tasks
         _selectedTask = State(initialValue: entry.task)
+        _selectedProject = State(initialValue: entry.project)
         _duration = State(initialValue: entry.duration)
         _notes = State(initialValue: entry.notes)
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
+                Section("Project") {
+                    Picker("Project", selection: $selectedProject) {
+                        Text("Select project…").tag(nil as Project?)
+                        ForEach(editableProjectList) { project in
+                            Text(project.name).tag(project as Project?)
+                        }
+                    }
+                }
+
                 Section("Task") {
                     ForEach(editableTaskList) { task in
                         TaskRow(task: task, isSelected: selectedTask?.id == task.id) {
@@ -288,7 +348,7 @@ struct EditEntrySheet: View {
                         }
                     }
                 }
-                
+
                 Section("Time") {
                     HStack {
                         Text("Hours")
@@ -298,7 +358,7 @@ struct EditEntrySheet: View {
                             .frame(width: 80)
                             .multilineTextAlignment(.trailing)
                     }
-                    
+
                     HStack(spacing: 8) {
                         ForEach([0.5, 1.0, 2.0, 4.0, 8.0], id: \.self) { hours in
                             Button(String(format: hours == floor(hours) ? "%.0fh" : "%.1fh", hours)) {
@@ -308,12 +368,12 @@ struct EditEntrySheet: View {
                         }
                     }
                 }
-                
+
                 Section("Notes") {
                     TextEditor(text: $notes)
                         .frame(minHeight: 60)
                 }
-                
+
                 Section {
                     Button(role: .destructive) {
                         showingDeleteConfirmation = true
@@ -334,12 +394,12 @@ struct EditEntrySheet: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveChanges()
                     }
-                    .disabled(selectedTask == nil || duration <= 0)
+                    .disabled(selectedTask == nil || selectedProject == nil || duration <= 0)
                 }
             }
             .confirmationDialog("Delete Entry", isPresented: $showingDeleteConfirmation) {
@@ -351,16 +411,17 @@ struct EditEntrySheet: View {
                 Text("Are you sure you want to delete this time entry? This cannot be undone.")
             }
         }
-        .frame(minWidth: 400, minHeight: 450)
+        .frame(minWidth: 400, minHeight: 500)
     }
-    
+
     private func saveChanges() {
         entry.task = selectedTask
+        entry.project = selectedProject
         entry.duration = duration
         entry.notes = notes
         dismiss()
     }
-    
+
     private func deleteEntry() {
         modelContext.delete(entry)
         dismiss()
@@ -371,17 +432,17 @@ struct TaskRow: View {
     let task: TrackedTask
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         Button(action: onSelect) {
             HStack {
                 Image(systemName: task.category.icon)
                     .foregroundStyle(task.category.color)
-                
+
                 Text(task.name)
-                
+
                 Spacer()
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.blue)
@@ -396,18 +457,18 @@ struct TaskRow: View {
 struct NewTaskSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+
     let onTaskCreated: (TrackedTask) -> Void
-    
+
     @State private var name: String = ""
     @State private var category: TaskCategory = .misc
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("Task Name", text: $name)
-                    
+
                     Picker("Category", selection: $category) {
                         ForEach(TaskCategory.allCases) { category in
                             Label(category.displayName, systemImage: category.icon)
@@ -424,7 +485,7 @@ struct NewTaskSheet: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
                         createTask()
@@ -435,7 +496,7 @@ struct NewTaskSheet: View {
         }
         .frame(minWidth: 300, minHeight: 200)
     }
-    
+
     private func createTask() {
         let task = TrackedTask(name: name, category: category)
         modelContext.insert(task)
@@ -446,5 +507,5 @@ struct NewTaskSheet: View {
 
 #Preview {
     TimeEntrySheet(date: Date(), tasks: [])
-        .modelContainer(for: [TrackedTask.self, TimeEntry.self, DayOff.self], inMemory: true)
+        .modelContainer(for: [TrackedTask.self, TimeEntry.self, DayOff.self, Project.self], inMemory: true)
 }

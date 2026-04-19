@@ -99,12 +99,14 @@ struct CalendarView: View {
             ForEach(viewModel.currentMonthDates, id: \.self) { date in
                 let hours = viewModel.totalHoursForDate(date, entries: entries)
                 let dayOff = isDayOff(date)
+                let holidayName = viewModel.holidayName(for: date)
                 DayCell(
                     date: date,
                     isCurrentMonth: viewModel.isCurrentMonth(date),
                     isToday: viewModel.isToday(date),
                     isIncomplete: viewModel.isCurrentMonth(date) && !dayOff && viewModel.isIncompleteWeekday(date, totalHours: hours),
                     isDayOff: dayOff,
+                    holidayName: holidayName,
                     dayNumber: viewModel.dayNumber(date),
                     categories: viewModel.categoriesForDate(date, entries: entries),
                     totalHours: hours
@@ -129,6 +131,7 @@ struct DayCell: View {
     let isToday: Bool
     let isIncomplete: Bool
     let isDayOff: Bool
+    let holidayName: String?
     let dayNumber: String
     let categories: Set<TaskCategory>
     let totalHours: Double
@@ -166,6 +169,17 @@ struct DayCell: View {
                     Image(systemName: "moon.fill")
                         .font(.caption2)
                         .foregroundStyle(.green.opacity(0.7))
+                } else if let holidayName {
+                    Text(holidayName)
+                        .font(.caption2)
+                        .foregroundStyle(.purple.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if totalHours > 0 {
+                        Text(String(format: "%.1fh", totalHours))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 } else if totalHours > 0 {
                     Text(String(format: "%.1fh", totalHours))
                         .font(.caption2)
@@ -185,6 +199,9 @@ struct DayCell: View {
                 } else if isDayOff {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.green.opacity(0.12))
+                } else if holidayName != nil && isCurrentMonth {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.purple.opacity(0.10))
                 } else if isIncomplete {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.orange.opacity(0.12))

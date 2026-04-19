@@ -14,11 +14,13 @@ final class TimeEntry {
     var duration: Double // Hours
     var notes: String
     var task: TrackedTask?
-    
-    init(date: Date, duration: Double, notes: String = "", task: TrackedTask? = nil) {
+    var project: Project?
+
+    init(date: Date, duration: Double, notes: String = "", task: TrackedTask? = nil, project: Project? = nil) {
         self.date = date
         self.duration = duration
         self.notes = notes
         self.task = task
+        self.project = project
     }
 }
