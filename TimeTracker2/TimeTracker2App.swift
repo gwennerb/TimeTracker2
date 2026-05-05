@@ -39,8 +39,9 @@ struct TimeTracker2App: App {
         .modelContainer(sharedModelContainer)
 
         Settings {
-            // Replaced with SettingsView() in Task 15.
-            ReminderSettingsView()
+            SettingsView()
+                .frame(minWidth: 480, minHeight: 360)
         }
+        .modelContainer(sharedModelContainer)
     }
 }

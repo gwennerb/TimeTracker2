@@ -55,7 +55,7 @@ struct ContentView: View {
                 case .summary:
                     SummaryView()
                 case .settings:
-                    ReminderSettingsView()
+                    SettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
