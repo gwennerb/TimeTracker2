@@ -35,17 +35,18 @@ struct CategoriesSection: View {
             Text("Categories")
                 .font(.headline)
 
-            VStack(spacing: 0) {
+            // Use `List` so `.onMove` actually fires on macOS — `ForEach` in a
+            // `VStack` silently drops the modifier. Internal scrolling is
+            // disabled and the height pinned to content so the surrounding
+            // `ScrollView` remains the single scroll surface.
+            List {
                 ForEach(activeCategories) { category in
                     activeRow(category)
-
-                    if category.persistentModelID != activeCategories.last?.persistentModelID {
-                        Divider().padding(.leading, 36)
-                    }
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.visible)
+                        .listRowBackground(Color.clear)
                 }
                 .onMove(perform: moveCategories)
-
-                Divider()
 
                 Button {
                     sheetMode = .add
@@ -60,7 +61,15 @@ struct CategoriesSection: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .scrollDisabled(true)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: CGFloat(activeCategories.count + 1) * 36)
+            .padding(.vertical, 6)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
 
             if !archivedCategories.isEmpty {

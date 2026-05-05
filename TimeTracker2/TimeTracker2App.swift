@@ -41,6 +41,12 @@ struct TimeTracker2App: App {
         Settings {
             SettingsView()
                 .frame(minWidth: 480, minHeight: 360)
+                .task {
+                    // Mirrors the WindowGroup migration so users who open
+                    // Preferences via Dock → Preferences before the main window
+                    // mounts still hit a fully seeded store.
+                    CategoryMigration.run(in: sharedModelContainer.mainContext)
+                }
         }
         .modelContainer(sharedModelContainer)
     }

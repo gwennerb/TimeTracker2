@@ -29,8 +29,10 @@ enum CategoryMigration {
         do {
             try context.save()
         } catch {
-            // If the save fails the UserDefaults flag stays unset, so the next
-            // launch retries. We deliberately do not crash.
+            // Discard inserted seeds and pending back-link mutations so the
+            // context matches the on-disk state. The UserDefaults flag stays
+            // unset, so the next launch retries from a clean slate.
+            context.rollback()
             return
         }
 
