@@ -14,9 +14,17 @@ struct SummaryView: View {
     @Query private var entries: [TimeEntry]
     @Query(sort: \Project.name) private var allProjects: [Project]
     @Query private var daysOff: [DayOff]
+    @Query(filter: #Predicate<Category> { !$0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var activeCategories: [Category]
+    @Query(filter: #Predicate<Category> { $0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var archivedCategories: [Category]
 
     @State private var viewModel = SummaryViewModel()
-    @State private var expandedCategories: Set<TaskCategory> = Set(TaskCategory.allCases)
+    @State private var expandedCategories: Set<PersistentIdentifier> = []
+    @State private var hasSeededExpansion: Bool = false
+    @State private var showArchivedCategories: Bool = false
     @State private var exportStatusMessage: String?
     @State private var isExporting = false
     @State private var exportDocument = SummaryTextDocument(text: "")
@@ -50,6 +58,10 @@ struct SummaryView: View {
         .onChange(of: allProjects) { _, _ in
             pruneSelectionIfMissing()
         }
+        .onChange(of: activeCategories) { _, newValue in
+            seedExpansionIfNeeded(active: newValue)
+        }
+        .task { seedExpansionIfNeeded(active: activeCategories) }
         .alert("Summary Export", isPresented: Binding(
             get: { exportStatusMessage != nil },
             set: { if !$0 { exportStatusMessage = nil } }
@@ -97,6 +109,11 @@ struct SummaryView: View {
                     .font(.title2)
             }
             .buttonStyle(.plain)
+
+            Toggle("Archived", isOn: $showArchivedCategories)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .help("Surface archived categories so historical hours stay reachable.")
 
             Button(action: copyForDiscord) {
                 Label("Copy for Discord", systemImage: "doc.on.clipboard")
@@ -216,31 +233,54 @@ struct SummaryView: View {
 
     private var categoryCards: some View {
         VStack(spacing: 12) {
-            ForEach(TaskCategory.allCases) { category in
+            ForEach(activeCategories) { category in
                 let categoryHours = viewModel.totalHoursForCategory(category, entries: entries)
-
                 if categoryHours > 0 {
                     CategoryCard(
                         category: category,
                         totalHours: categoryHours,
                         taskHours: viewModel.taskHoursForCategory(category, entries: entries),
-                        isExpanded: expandedCategories.contains(category)
+                        isExpanded: expandedCategories.contains(category.persistentModelID),
+                        archived: false
                     ) {
-                        toggleCategory(category)
+                        toggleCategory(category.persistentModelID)
+                    }
+                }
+            }
+
+            if showArchivedCategories {
+                ForEach(archivedCategories) { category in
+                    let categoryHours = viewModel.totalHoursForCategory(category, entries: entries)
+                    if categoryHours > 0 {
+                        CategoryCard(
+                            category: category,
+                            totalHours: categoryHours,
+                            taskHours: viewModel.taskHoursForCategory(category, entries: entries),
+                            isExpanded: expandedCategories.contains(category.persistentModelID),
+                            archived: true
+                        ) {
+                            toggleCategory(category.persistentModelID)
+                        }
                     }
                 }
             }
         }
     }
 
-    private func toggleCategory(_ category: TaskCategory) {
+    private func toggleCategory(_ id: PersistentIdentifier) {
         withAnimation {
-            if expandedCategories.contains(category) {
-                expandedCategories.remove(category)
+            if expandedCategories.contains(id) {
+                expandedCategories.remove(id)
             } else {
-                expandedCategories.insert(category)
+                expandedCategories.insert(id)
             }
         }
+    }
+
+    private func seedExpansionIfNeeded(active: [Category]) {
+        guard !hasSeededExpansion, !active.isEmpty else { return }
+        expandedCategories = Set(active.map { $0.persistentModelID })
+        hasSeededExpansion = true
     }
 
     private func pruneSelectionIfMissing() {
@@ -250,15 +290,22 @@ struct SummaryView: View {
         }
     }
 
+    private var allCategoriesForExport: [Category] {
+        activeCategories + archivedCategories
+    }
+
     private func exportSummary() {
-        exportDocument = SummaryTextDocument(text: viewModel.exportText(for: entries))
+        exportDocument = SummaryTextDocument(
+            text: viewModel.exportText(for: entries, categories: allCategoriesForExport)
+        )
         isExporting = true
     }
 
     private func copyForDiscord() {
         let text = viewModel.discordExportText(
             for: entries,
-            expectedHours: viewModel.expectedHoursForMonth(daysOff)
+            expectedHours: viewModel.expectedHoursForMonth(daysOff),
+            categories: allCategoriesForExport
         )
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -307,24 +354,31 @@ private struct SummaryTextDocument: FileDocument {
 }
 
 struct CategoryCard: View {
-    let category: TaskCategory
+    let category: Category
     let totalHours: Double
     let taskHours: [(task: TrackedTask, hours: Double)]
     let isExpanded: Bool
+    let archived: Bool
     let onToggle: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
             Button(action: onToggle) {
                 HStack {
-                    Image(systemName: category.icon)
+                    Image(systemName: category.iconSymbol)
                         .font(.title2)
                         .foregroundStyle(category.color)
                         .frame(width: 32)
 
-                    Text(category.displayName)
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(category.name)
+                            .font(.headline)
+                        if archived {
+                            Text("Archived")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     Spacer()
 
@@ -341,19 +395,21 @@ struct CategoryCard: View {
             }
             .buttonStyle(.plain)
 
-            // Expanded task list
             if isExpanded && !taskHours.isEmpty {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(taskHours, id: \.task.id) { item in
-                        TaskHoursRow(taskName: item.task.name, hours: item.hours, color: category.color)
+                        TaskHoursRow(taskName: item.task.name,
+                                     hours: item.hours,
+                                     color: category.color)
                     }
                 }
             }
         }
         .padding()
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .opacity(archived ? 0.55 : 1.0)
     }
 }
 

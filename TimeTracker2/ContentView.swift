@@ -31,7 +31,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .summary:
             return "chart.bar.fill"
         case .settings:
-            return "bell.badge"
+            return "gearshape"
         }
     }
 }
@@ -55,7 +55,7 @@ struct ContentView: View {
                 case .summary:
                     SummaryView()
                 case .settings:
-                    ReminderSettingsView()
+                    SettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

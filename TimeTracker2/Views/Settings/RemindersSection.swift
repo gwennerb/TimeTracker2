@@ -1,5 +1,5 @@
 //
-//  ReminderSettingsView.swift
+//  RemindersSection.swift
 //  TimeTracker2
 //
 
@@ -7,7 +7,7 @@ import SwiftUI
 import UserNotifications
 import AppKit
 
-struct ReminderSettingsView: View {
+struct RemindersSection: View {
     @AppStorage(ReminderPreferences.enabledKey) private var isReminderEnabled = ReminderPreferences.defaultEnabled
     @AppStorage(ReminderPreferences.hourKey) private var reminderHour = ReminderPreferences.defaultHour
     @AppStorage(ReminderPreferences.minuteKey) private var reminderMinute = ReminderPreferences.defaultMinute
@@ -15,38 +15,38 @@ struct ReminderSettingsView: View {
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
-        Form {
-            Section("Time Entry Reminder") {
-                Toggle("Enable weekday reminders", isOn: $isReminderEnabled)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Time Entry Reminder")
+                .font(.headline)
 
-                DatePicker(
-                    "Reminder time",
-                    selection: reminderTimeBinding,
-                    displayedComponents: [.hourAndMinute]
-                )
+            Toggle("Enable weekday reminders", isOn: $isReminderEnabled)
+
+            DatePicker("Reminder time",
+                       selection: reminderTimeBinding,
+                       displayedComponents: [.hourAndMinute])
                 .disabled(!isReminderEnabled)
 
-                Text("Reminders are scheduled Monday to Friday.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Reminders are scheduled Monday to Friday.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-            Section("Notification Access") {
-                Text(authorizationDescription)
-                    .foregroundStyle(.secondary)
+            Divider()
 
-                if authorizationStatus == .denied {
-                    Button("Open Notification Settings") {
-                        openNotificationSettings()
-                    }
+            Text("Notification Access")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text(authorizationDescription)
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            if authorizationStatus == .denied {
+                Button("Open Notification Settings") {
+                    openNotificationSettings()
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 240)
-        .task {
-            await syncAndRefreshStatus()
-        }
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .task { await syncAndRefreshStatus() }
         .onChange(of: isReminderEnabled) { _, _ in
             Task { await syncAndRefreshStatus() }
         }
@@ -63,9 +63,7 @@ struct ReminderSettingsView: View {
             get: {
                 let calendar = Calendar.current
                 let components = DateComponents(hour: reminderHour, minute: reminderMinute)
-                if let date = calendar.date(from: components) {
-                    return date
-                }
+                if let date = calendar.date(from: components) { return date }
                 return calendar.date(from: DateComponents(
                     hour: ReminderPreferences.defaultHour,
                     minute: ReminderPreferences.defaultMinute
@@ -95,19 +93,11 @@ struct ReminderSettingsView: View {
     private func syncAndRefreshStatus() async {
         await ReminderScheduler.syncFromPreferences()
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        await MainActor.run {
-            authorizationStatus = settings.authorizationStatus
-        }
+        await MainActor.run { authorizationStatus = settings.authorizationStatus }
     }
 
     private func openNotificationSettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else {
-            return
-        }
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
         NSWorkspace.shared.open(url)
     }
-}
-
-#Preview {
-    ReminderSettingsView()
 }

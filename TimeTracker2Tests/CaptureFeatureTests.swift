@@ -28,8 +28,8 @@ struct CaptureFeatureTests {
     // MARK: - sortedByRecency
 
     @Test func sortedByRecencyPutsRecentlyUsedFirst() async throws {
-        let oldFavorite = TrackedTask(name: "Old Favorite", category: .app)
-        let recentNewbie = TrackedTask(name: "Recent Newbie", category: .app)
+        let oldFavorite = TrackedTask(name: "Old Favorite")
+        let recentNewbie = TrackedTask(name: "Recent Newbie")
 
         let oldEntries = (1...10).map {
             TimeEntry(date: date(2026, 1, $0), duration: 1, task: oldFavorite, project: nil)
@@ -45,8 +45,8 @@ struct CaptureFeatureTests {
     }
 
     @Test func sortedByRecencyTieBreaksOnEntryCount() async throws {
-        let busy = TrackedTask(name: "Busy", category: .app)
-        let quiet = TrackedTask(name: "Quiet", category: .app)
+        let busy = TrackedTask(name: "Busy")
+        let quiet = TrackedTask(name: "Quiet")
         let sharedDate = date(2026, 4, 1)
 
         busy.entries = (0..<5).map { _ in TimeEntry(date: sharedDate, duration: 1, task: busy, project: nil) }
@@ -63,7 +63,7 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(project)
         context.insert(task)
 
@@ -95,7 +95,7 @@ struct CaptureFeatureTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(task)
 
         let source = date(2026, 4, 1)
@@ -119,8 +119,8 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let taskA = TrackedTask(name: "A", category: .app)
-        let taskB = TrackedTask(name: "B", category: .portal)
+        let taskA = TrackedTask(name: "A")
+        let taskB = TrackedTask(name: "B")
         context.insert(project)
         context.insert(taskA)
         context.insert(taskB)
@@ -154,7 +154,7 @@ struct CaptureFeatureTests {
     // MARK: - mostRecentPriorDay
 
     @Test func mostRecentPriorDayPicksLatestBefore() async throws {
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         let project = Project(name: "P")
         let entries = [
             TimeEntry(date: date(2026, 4, 1), duration: 1, task: task, project: project),
@@ -170,7 +170,7 @@ struct CaptureFeatureTests {
     }
 
     @Test func mostRecentPriorDayReturnsNilWhenNoEarlierEntry() async throws {
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         let entries = [
             TimeEntry(date: date(2026, 4, 10), duration: 1, task: task, project: nil),
         ]
@@ -188,7 +188,7 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(project)
         context.insert(task)
 
@@ -214,7 +214,7 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(project)
         context.insert(task)
         let existing = TimeEntry(date: date(2026, 4, 13), duration: 2, task: task, project: project)
@@ -236,7 +236,7 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(project)
         context.insert(task)
         let existing = TimeEntry(date: date(2026, 4, 13), duration: 2, task: task, project: project)
@@ -260,7 +260,7 @@ struct CaptureFeatureTests {
         let context = container.mainContext
 
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         context.insert(project)
         context.insert(task)
 
@@ -276,7 +276,7 @@ struct CaptureFeatureTests {
 
     @Test func quickEntryCellStateSumsMultipleEntries() async throws {
         let project = Project(name: "P")
-        let task = TrackedTask(name: "T", category: .app)
+        let task = TrackedTask(name: "T")
         let day = date(2026, 4, 13)
         let entries = [
             TimeEntry(date: day, duration: 2, task: task, project: project),
@@ -301,11 +301,13 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 2, 10)
 
+        let app = TimeTracker2.Category(name: "App", colorName: "blue",
+                                        iconSymbol: "app.fill", order: 0)
         let project = Project(name: "Acme")
-        let task = TrackedTask(name: "Build", category: .app)
+        let task = TrackedTask(name: "Build", category: app)
         let entry = TimeEntry(date: date(2026, 2, 3), duration: 4, task: task, project: project)
 
-        let text = vm.discordExportText(for: [entry], expectedHours: 160)
+        let text = vm.discordExportText(for: [entry], expectedHours: 160, categories: [app])
         #expect(text.contains("**TimeTracker — February 2026**"))
         #expect(text.contains("Total: 4.0h"))
         #expect(text.contains("Expected: 160.0h"))
@@ -320,16 +322,18 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 2, 10)
 
+        let app = TimeTracker2.Category(name: "App", colorName: "blue",
+                                        iconSymbol: "app.fill", order: 0)
         let project = Project(name: "Acme")
-        let frontend = TrackedTask(name: "Frontend", category: .app)
-        let backend = TrackedTask(name: "Backend", category: .app)
+        let frontend = TrackedTask(name: "Frontend", category: app)
+        let backend = TrackedTask(name: "Backend", category: app)
         let entries = [
             TimeEntry(date: date(2026, 2, 3), duration: 6, task: frontend, project: project),
             TimeEntry(date: date(2026, 2, 4), duration: 2, task: backend, project: project),
         ]
 
         vm.selectedProject = project
-        let text = vm.discordExportText(for: entries, expectedHours: 160)
+        let text = vm.discordExportText(for: entries, expectedHours: 160, categories: [app])
         #expect(text.contains("**TimeTracker — February 2026 — Acme**"))
         #expect(text.contains("Frontend"))
         #expect(text.contains("Backend"))
@@ -341,7 +345,7 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 7, 1)
 
-        let text = vm.discordExportText(for: [], expectedHours: 168)
+        let text = vm.discordExportText(for: [], expectedHours: 168, categories: [])
         #expect(text.contains("_No entries logged for this month._"))
     }
 }
