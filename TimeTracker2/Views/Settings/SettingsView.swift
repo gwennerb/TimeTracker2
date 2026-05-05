@@ -23,11 +23,3 @@ struct SettingsView: View {
         .modelContainer(for: [TrackedTask.self, TimeEntry.self, Project.self,
                               DayOff.self, Category.self], inMemory: true)
 }
-
-private struct CategoriesSection: View {
-    var body: some View {
-        Text("Categories — TODO Task 14")
-            .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-}
