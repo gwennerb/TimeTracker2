@@ -2,15 +2,21 @@
 //  TasksView.swift
 //  TimeTracker2
 //
-//  Created by Per Bergström on 2025-12-06.
-//
 
 import SwiftUI
 import SwiftData
 
 struct TasksView: View {
     @Query(sort: \TrackedTask.name) private var allTasks: [TrackedTask]
-    @State private var showArchived: Bool = false
+    @Query(filter: #Predicate<Category> { !$0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var activeCategories: [Category]
+    @Query(filter: #Predicate<Category> { $0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var archivedCategories: [Category]
+
+    @State private var showArchivedTasks: Bool = false
+    @State private var showArchivedCategories: Bool = false
     @State private var editingTask: TrackedTask?
 
     private var activeTasks: [TrackedTask] {
@@ -21,23 +27,28 @@ struct TasksView: View {
         allTasks.filter { $0.isArchived }
     }
 
-    private var groupedActiveTasks: [(TaskCategory, [TrackedTask])] {
-        let grouped = Dictionary(grouping: activeTasks) { $0.category }
-        return TaskCategory.allCases.compactMap { category in
-            guard let tasks = grouped[category], !tasks.isEmpty else { return nil }
-            return (category, tasks.sorted { $0.name < $1.name })
-        }
+    private func tasks(for category: Category, includeArchivedTasks: Bool) -> [TrackedTask] {
+        let pool = includeArchivedTasks ? allTasks : activeTasks
+        return pool
+            .filter { $0.category?.persistentModelID == category.persistentModelID }
+            .sorted { $0.name < $1.name }
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Active tasks grouped by category
-                ForEach(groupedActiveTasks, id: \.0) { category, tasks in
-                    categorySection(category: category, tasks: tasks, archived: false)
+                viewHeader
+
+                ForEach(activeCategories) { category in
+                    let categoryTasks = tasks(for: category, includeArchivedTasks: false)
+                    if !categoryTasks.isEmpty {
+                        categorySection(category: category,
+                                        tasks: categoryTasks,
+                                        archivedCategory: false)
+                    }
                 }
 
-                if activeTasks.isEmpty {
+                if activeTasks.isEmpty && !showArchivedTasks {
                     ContentUnavailableView {
                         Label("No Tasks", systemImage: "tray")
                     } description: {
@@ -45,9 +56,19 @@ struct TasksView: View {
                     }
                 }
 
-                // Archived section
+                if showArchivedCategories {
+                    ForEach(archivedCategories) { category in
+                        let categoryTasks = tasks(for: category, includeArchivedTasks: true)
+                        if !categoryTasks.isEmpty {
+                            categorySection(category: category,
+                                            tasks: categoryTasks,
+                                            archivedCategory: true)
+                        }
+                    }
+                }
+
                 if !archivedTasks.isEmpty {
-                    archivedSection
+                    archivedTasksSection
                 }
             }
             .padding()
@@ -57,16 +78,44 @@ struct TasksView: View {
         }
     }
 
-    private func categorySection(category: TaskCategory, tasks: [TrackedTask], archived: Bool) -> some View {
+    private var viewHeader: some View {
+        HStack {
+            Text("Tasks")
+                .font(.title2)
+                .fontWeight(.semibold)
+            Spacer()
+            Toggle("Show archived categories", isOn: $showArchivedCategories)
+                .toggleStyle(.switch)
+                .help("Reveals categories that have been archived so historical tasks stay reachable.")
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func categorySection(category: Category,
+                                 tasks: [TrackedTask],
+                                 archivedCategory: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(category.displayName, systemImage: category.icon)
-                .font(.headline)
-                .foregroundStyle(category.color)
-                .padding(.horizontal, 4)
+            HStack(spacing: 6) {
+                Label(category.name, systemImage: category.iconSymbol)
+                    .font(.headline)
+                    .foregroundStyle(category.color)
+                if archivedCategory {
+                    Text("Archived")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
                 ForEach(tasks) { task in
-                    taskRow(task: task, archived: archived)
+                    taskRow(task: task, archivedCategory: archivedCategory)
 
                     if task.id != tasks.last?.id {
                         Divider().padding(.leading, 36)
@@ -75,19 +124,29 @@ struct TasksView: View {
             }
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
+        .opacity(archivedCategory ? 0.55 : 1.0)
     }
 
-    private func taskRow(task: TrackedTask, archived: Bool) -> some View {
+    private func taskRow(task: TrackedTask, archivedCategory: Bool) -> some View {
         Button {
             editingTask = task
         } label: {
             HStack {
-                Image(systemName: task.category.icon)
-                    .foregroundStyle(task.category.color)
+                Image(systemName: task.category?.iconSymbol ?? "questionmark.circle")
+                    .foregroundStyle(task.category?.color ?? .gray)
                     .frame(width: 24)
 
                 Text(task.name)
                     .lineLimit(1)
+
+                if task.isArchived {
+                    Text("Archived task")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(.quaternary, in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -105,44 +164,44 @@ struct TasksView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            if archived {
+            if task.isArchived {
                 Button {
                     task.isArchived = false
                 } label: {
-                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    Label("Unarchive task", systemImage: "tray.and.arrow.up")
                 }
             } else {
                 Button {
                     task.isArchived = true
                 } label: {
-                    Label("Archive", systemImage: "archivebox")
+                    Label("Archive task", systemImage: "archivebox")
                 }
             }
         }
     }
 
-    private var archivedSection: some View {
+    private var archivedTasksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation { showArchived.toggle() }
+                withAnimation { showArchivedTasks.toggle() }
             } label: {
                 HStack {
-                    Label("Archived", systemImage: "archivebox")
+                    Label("Archived tasks", systemImage: "archivebox")
                         .font(.headline)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .rotationEffect(.degrees(showArchived ? 90 : 0))
+                        .rotationEffect(.degrees(showArchivedTasks ? 90 : 0))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 4)
             }
             .buttonStyle(.plain)
 
-            if showArchived {
+            if showArchivedTasks {
                 VStack(spacing: 0) {
                     ForEach(archivedTasks) { task in
-                        taskRow(task: task, archived: true)
+                        taskRow(task: task, archivedCategory: false)
 
                         if task.id != archivedTasks.last?.id {
                             Divider().padding(.leading, 36)
@@ -158,17 +217,32 @@ struct TasksView: View {
 struct EditTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
 
+    @Query(filter: #Predicate<Category> { !$0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var activeCategories: [Category]
+
     let task: TrackedTask
 
     @State private var name: String
-    @State private var category: TaskCategory
+    @State private var selectedCategory: Category?
     @State private var isArchived: Bool
 
     init(task: TrackedTask) {
         self.task = task
         _name = State(initialValue: task.name)
-        _category = State(initialValue: task.category)
+        _selectedCategory = State(initialValue: task.category)
         _isArchived = State(initialValue: task.isArchived)
+    }
+
+    private var pickerCategories: [Category] {
+        // Always include the currently selected category, even if it has been archived,
+        // so the picker doesn't silently drop the assignment.
+        var list = activeCategories
+        if let current = selectedCategory,
+           !list.contains(where: { $0.persistentModelID == current.persistentModelID }) {
+            list.insert(current, at: 0)
+        }
+        return list
     }
 
     var body: some View {
@@ -177,10 +251,11 @@ struct EditTaskSheet: View {
                 Section {
                     TextField("Task Name", text: $name)
 
-                    Picker("Category", selection: $category) {
-                        ForEach(TaskCategory.allCases) { cat in
-                            Label(cat.displayName, systemImage: cat.icon)
-                                .tag(cat)
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("Select a category…").tag(nil as Category?)
+                        ForEach(pickerCategories) { category in
+                            Label(category.name, systemImage: category.iconSymbol)
+                                .tag(category as Category?)
                         }
                     }
                 }
@@ -198,11 +273,11 @@ struct EditTaskSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         task.name = name
-                        task.category = category
+                        task.category = selectedCategory
                         task.isArchived = isArchived
                         dismiss()
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(name.isEmpty || selectedCategory == nil)
                 }
             }
         }
@@ -212,5 +287,5 @@ struct EditTaskSheet: View {
 
 #Preview {
     TasksView()
-        .modelContainer(for: [TrackedTask.self, TimeEntry.self], inMemory: true)
+        .modelContainer(for: [TrackedTask.self, TimeEntry.self, Category.self], inMemory: true)
 }

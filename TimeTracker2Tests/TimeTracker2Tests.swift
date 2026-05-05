@@ -16,9 +16,11 @@ struct TimeTracker2Tests {
         let calendar = Calendar(identifier: .gregorian)
         viewModel.selectedMonth = calendar.date(from: DateComponents(year: 2026, month: 2, day: 10))!
 
+        let app = Category(name: "App", colorName: "blue", iconSymbol: "app.fill", order: 0)
+        let portal = Category(name: "Portal", colorName: "purple", iconSymbol: "globe", order: 1)
         let project = Project(name: "Varberg")
-        let appTask = TrackedTask(name: "Feature Work", category: .app)
-        let portalTask = TrackedTask(name: "Portal Support", category: .portal)
+        let appTask = TrackedTask(name: "Feature Work", category: app)
+        let portalTask = TrackedTask(name: "Portal Support", category: portal)
 
         let matchingEntries = [
             TimeEntry(
@@ -44,7 +46,8 @@ struct TimeTracker2Tests {
             project: project
         )
 
-        let text = viewModel.exportText(for: matchingEntries + [nonMatchingEntry])
+        let text = viewModel.exportText(for: matchingEntries + [nonMatchingEntry],
+                                        categories: [app, portal])
 
         #expect(text.contains("TimeTracker Summary - \(viewModel.monthYearString)"))
         #expect(text.contains("Total Hours: 3.0h"))
@@ -65,9 +68,10 @@ struct TimeTracker2Tests {
         let calendar = Calendar(identifier: .gregorian)
         viewModel.selectedMonth = calendar.date(from: DateComponents(year: 2026, month: 2, day: 10))!
 
+        let app = Category(name: "App", colorName: "blue", iconSymbol: "app.fill", order: 0)
         let varberg = Project(name: "Varberg")
         let acme = Project(name: "Acme")
-        let task = TrackedTask(name: "Feature Work", category: .app)
+        let task = TrackedTask(name: "Feature Work", category: app)
 
         let entries = [
             TimeEntry(
@@ -87,7 +91,7 @@ struct TimeTracker2Tests {
         ]
 
         viewModel.selectedProject = varberg
-        let text = viewModel.exportText(for: entries)
+        let text = viewModel.exportText(for: entries, categories: [app])
 
         #expect(text.contains("Project: Varberg"))
         #expect(text.contains("Total Hours: 2.0h"))
@@ -95,13 +99,13 @@ struct TimeTracker2Tests {
         #expect(!text.contains("Acme work"))
         #expect(!text.contains("Project Totals:"))
     }
-    
+
     @Test func summaryExportEmptyMonthShowsNoEntriesMessage() async throws {
         let viewModel = SummaryViewModel()
         let calendar = Calendar(identifier: .gregorian)
         viewModel.selectedMonth = calendar.date(from: DateComponents(year: 2026, month: 7, day: 1))!
 
-        let text = viewModel.exportText(for: [])
+        let text = viewModel.exportText(for: [], categories: [])
 
         #expect(text.contains("Total Hours: 0.0h"))
         #expect(text.contains("No entries logged for this month."))

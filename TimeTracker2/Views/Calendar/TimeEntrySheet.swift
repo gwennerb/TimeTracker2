@@ -14,6 +14,9 @@ struct TimeEntrySheet: View {
     @Query private var allEntries: [TimeEntry]
     @Query private var daysOff: [DayOff]
     @Query(sort: \Project.name) private var allProjects: [Project]
+    @Query(filter: #Predicate<Category> { !$0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var activeCategories: [Category]
 
     let date: Date
     let tasks: [TrackedTask]
@@ -23,7 +26,7 @@ struct TimeEntrySheet: View {
     @State private var duration: Double = 1.0
     @State private var notes: String = ""
     @State private var searchText: String = ""
-    @State private var selectedCategory: TaskCategory?
+    @State private var selectedCategory: Category?
     @State private var showingNewTaskSheet: Bool = false
     @State private var showingNewProjectSheet: Bool = false
     @State private var entryToEdit: TimeEntry?
@@ -43,7 +46,7 @@ struct TimeEntrySheet: View {
         var filtered = tasks.filter { !$0.isArchived }
 
         if let category = selectedCategory {
-            filtered = filtered.filter { $0.category == category }
+            filtered = filtered.filter { $0.category?.persistentModelID == category.persistentModelID }
         }
 
         if !searchText.isEmpty {
@@ -101,10 +104,10 @@ struct TimeEntrySheet: View {
                     }
 
                     Picker("Category", selection: $selectedCategory) {
-                        Text("All Categories").tag(nil as TaskCategory?)
-                        ForEach(TaskCategory.allCases) { category in
-                            Label(category.displayName, systemImage: category.icon)
-                                .tag(category as TaskCategory?)
+                        Text("All Categories").tag(nil as Category?)
+                        ForEach(activeCategories) { category in
+                            Label(category.name, systemImage: category.iconSymbol)
+                                .tag(category as Category?)
                         }
                     }
 
@@ -275,8 +278,8 @@ struct ExistingEntryRow: View {
         Button(action: onEdit) {
             HStack {
                 if let task = entry.task {
-                    Image(systemName: task.category.icon)
-                        .foregroundStyle(task.category.color)
+                    Image(systemName: task.category?.iconSymbol ?? "questionmark.circle")
+                        .foregroundStyle(task.category?.color ?? .gray)
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
@@ -468,8 +471,8 @@ struct TaskRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack {
-                Image(systemName: task.category.icon)
-                    .foregroundStyle(task.category.color)
+                Image(systemName: task.category?.iconSymbol ?? "questionmark.circle")
+                    .foregroundStyle(task.category?.color ?? .gray)
 
                 Text(task.name)
 
@@ -490,10 +493,14 @@ struct NewTaskSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @Query(filter: #Predicate<Category> { !$0.isArchived },
+           sort: [SortDescriptor(\Category.order)])
+    private var activeCategories: [Category]
+
     let onTaskCreated: (TrackedTask) -> Void
 
     @State private var name: String = ""
-    @State private var category: TaskCategory = .misc
+    @State private var selectedCategory: Category?
 
     var body: some View {
         NavigationStack {
@@ -501,10 +508,11 @@ struct NewTaskSheet: View {
                 Section {
                     TextField("Task Name", text: $name)
 
-                    Picker("Category", selection: $category) {
-                        ForEach(TaskCategory.allCases) { category in
-                            Label(category.displayName, systemImage: category.icon)
-                                .tag(category)
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("Select a category…").tag(nil as Category?)
+                        ForEach(activeCategories) { category in
+                            Label(category.name, systemImage: category.iconSymbol)
+                                .tag(category as Category?)
                         }
                     }
                 }
@@ -513,23 +521,20 @@ struct NewTaskSheet: View {
             .navigationTitle("New Task")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Cancel") { dismiss() }
                 }
-
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        createTask()
-                    }
-                    .disabled(name.isEmpty)
+                    Button("Create") { createTask() }
+                        .disabled(name.isEmpty || selectedCategory == nil)
                 }
             }
+            .onAppear { selectedCategory = activeCategories.first }
         }
         .frame(minWidth: 300, minHeight: 200)
     }
 
     private func createTask() {
+        guard let category = selectedCategory else { return }
         let task = TrackedTask(name: name, category: category)
         modelContext.insert(task)
         onTaskCreated(task)

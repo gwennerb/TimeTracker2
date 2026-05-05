@@ -301,11 +301,13 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 2, 10)
 
+        let app = TimeTracker2.Category(name: "App", colorName: "blue",
+                                        iconSymbol: "app.fill", order: 0)
         let project = Project(name: "Acme")
-        let task = TrackedTask(name: "Build", category: .app)
+        let task = TrackedTask(name: "Build", category: app)
         let entry = TimeEntry(date: date(2026, 2, 3), duration: 4, task: task, project: project)
 
-        let text = vm.discordExportText(for: [entry], expectedHours: 160)
+        let text = vm.discordExportText(for: [entry], expectedHours: 160, categories: [app])
         #expect(text.contains("**TimeTracker — February 2026**"))
         #expect(text.contains("Total: 4.0h"))
         #expect(text.contains("Expected: 160.0h"))
@@ -320,16 +322,18 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 2, 10)
 
+        let app = TimeTracker2.Category(name: "App", colorName: "blue",
+                                        iconSymbol: "app.fill", order: 0)
         let project = Project(name: "Acme")
-        let frontend = TrackedTask(name: "Frontend", category: .app)
-        let backend = TrackedTask(name: "Backend", category: .app)
+        let frontend = TrackedTask(name: "Frontend", category: app)
+        let backend = TrackedTask(name: "Backend", category: app)
         let entries = [
             TimeEntry(date: date(2026, 2, 3), duration: 6, task: frontend, project: project),
             TimeEntry(date: date(2026, 2, 4), duration: 2, task: backend, project: project),
         ]
 
         vm.selectedProject = project
-        let text = vm.discordExportText(for: entries, expectedHours: 160)
+        let text = vm.discordExportText(for: entries, expectedHours: 160, categories: [app])
         #expect(text.contains("**TimeTracker — February 2026 — Acme**"))
         #expect(text.contains("Frontend"))
         #expect(text.contains("Backend"))
@@ -341,7 +345,7 @@ struct CaptureFeatureTests {
         let vm = SummaryViewModel()
         vm.selectedMonth = date(2026, 7, 1)
 
-        let text = vm.discordExportText(for: [], expectedHours: 168)
+        let text = vm.discordExportText(for: [], expectedHours: 168, categories: [])
         #expect(text.contains("_No entries logged for this month._"))
     }
 }

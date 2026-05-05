@@ -246,8 +246,8 @@ private struct QuickEntryRow: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: task.category.icon)
-                    .foregroundStyle(task.category.color)
+                Image(systemName: task.category?.iconSymbol ?? "questionmark.circle")
+                    .foregroundStyle(task.category?.color ?? .gray)
                 Text(task.name)
                     .font(.body)
                     .lineLimit(1)

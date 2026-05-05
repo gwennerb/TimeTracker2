@@ -133,7 +133,7 @@ struct DayCell: View {
     let isDayOff: Bool
     let holidayName: String?
     let dayNumber: String
-    let categories: Set<TaskCategory>
+    let categories: Set<Category>
     let totalHours: Double
     let onTap: () -> Void
     

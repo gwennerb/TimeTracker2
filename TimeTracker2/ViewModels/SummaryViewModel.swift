@@ -113,26 +113,24 @@ final class SummaryViewModel {
             .reduce(0) { $0 + $1.duration }
     }
 
-    func entriesByCategory(_ entries: [TimeEntry]) -> [TaskCategory: [TimeEntry]] {
+    /// Group entries by their task's category. Entries whose task has no category
+    /// (shouldn't happen post-migration) are dropped.
+    func entriesByCategory(_ entries: [TimeEntry]) -> [PersistentIdentifier: [TimeEntry]] {
         let scopedEntries = scopedEntriesForMonth(entries)
-        var grouped: [TaskCategory: [TimeEntry]] = [:]
-
-        for category in TaskCategory.allCases {
-            let categoryEntries = scopedEntries.filter { $0.task?.category == category }
-            if !categoryEntries.isEmpty {
-                grouped[category] = categoryEntries
-            }
+        var grouped: [PersistentIdentifier: [TimeEntry]] = [:]
+        for entry in scopedEntries {
+            guard let categoryID = entry.task?.category?.persistentModelID else { continue }
+            grouped[categoryID, default: []].append(entry)
         }
-
         return grouped
     }
 
-    func totalHoursForCategory(_ category: TaskCategory, entries: [TimeEntry]) -> Double {
-        entriesByCategory(entries)[category]?.reduce(0) { $0 + $1.duration } ?? 0
+    func totalHoursForCategory(_ category: Category, entries: [TimeEntry]) -> Double {
+        entriesByCategory(entries)[category.persistentModelID]?.reduce(0) { $0 + $1.duration } ?? 0
     }
 
-    func taskHoursForCategory(_ category: TaskCategory, entries: [TimeEntry]) -> [(task: TrackedTask, hours: Double)] {
-        guard let categoryEntries = entriesByCategory(entries)[category] else { return [] }
+    func taskHoursForCategory(_ category: Category, entries: [TimeEntry]) -> [(task: TrackedTask, hours: Double)] {
+        guard let categoryEntries = entriesByCategory(entries)[category.persistentModelID] else { return [] }
 
         var taskHours: [String: (task: TrackedTask, hours: Double)] = [:]
 
@@ -149,14 +147,14 @@ final class SummaryViewModel {
         return taskHours.values.sorted { $0.hours > $1.hours }
     }
 
-    func exportText(for entries: [TimeEntry]) -> String {
+    func exportText(for entries: [TimeEntry], categories: [Category]) -> String {
         if let project = selectedProject {
-            return exportTextForProject(project, entries: entries)
+            return exportTextForProject(project, entries: entries, categories: categories)
         }
-        return exportTextForAllProjects(entries: entries)
+        return exportTextForAllProjects(entries: entries, categories: categories)
     }
 
-    private func exportTextForAllProjects(entries: [TimeEntry]) -> String {
+    private func exportTextForAllProjects(entries: [TimeEntry], categories: [Category]) -> String {
         let monthEntries = entriesForMonth(entries)
         var lines: [String] = []
 
@@ -183,7 +181,7 @@ final class SummaryViewModel {
         lines.append("")
 
         for project in projects {
-            lines.append(contentsOf: projectSection(project, entries: entries))
+            lines.append(contentsOf: projectSection(project, entries: entries, categories: categories))
             lines.append("")
         }
 
@@ -194,7 +192,9 @@ final class SummaryViewModel {
         return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func exportTextForProject(_ project: Project, entries: [TimeEntry]) -> String {
+    private func exportTextForProject(_ project: Project,
+                                      entries: [TimeEntry],
+                                      categories: [Category]) -> String {
         var lines: [String] = []
 
         lines.append("TimeTracker Summary - \(monthYearString)")
@@ -208,12 +208,17 @@ final class SummaryViewModel {
             return lines.joined(separator: "\n")
         }
 
-        lines.append(contentsOf: projectSection(project, entries: entries, includeHeader: false))
+        lines.append(contentsOf: projectSection(project, entries: entries,
+                                                categories: categories,
+                                                includeHeader: false))
 
         return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func projectSection(_ project: Project, entries: [TimeEntry], includeHeader: Bool = true) -> [String] {
+    private func projectSection(_ project: Project,
+                                entries: [TimeEntry],
+                                categories: [Category],
+                                includeHeader: Bool = true) -> [String] {
         let previousSelection = selectedProject
         selectedProject = project
         defer { selectedProject = previousSelection }
@@ -225,11 +230,11 @@ final class SummaryViewModel {
         }
 
         lines.append("Category Totals:")
-        for category in TaskCategory.allCases {
+        for category in categories {
             let categoryHours = totalHoursForCategory(category, entries: entries)
             guard categoryHours > 0 else { continue }
 
-            lines.append("- \(category.displayName): \(formattedHours(categoryHours))h")
+            lines.append("- \(category.name): \(formattedHours(categoryHours))h")
             for item in taskHoursForCategory(category, entries: entries) {
                 lines.append("  - \(item.task.name): \(formattedHours(item.hours))h")
             }
@@ -281,7 +286,7 @@ final class SummaryViewModel {
 
     private func formatEntryLine(_ entry: TimeEntry, dateFormatter: DateFormatter) -> String {
         let taskName = entry.task?.name ?? "No Task"
-        let categoryName = entry.task?.category.displayName ?? "Uncategorized"
+        let categoryName = entry.task?.category?.name ?? "Uncategorized"
         let notes = entry.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesText = notes.isEmpty ? "-" : notes.replacingOccurrences(of: "\n", with: " ")
 
@@ -292,9 +297,11 @@ final class SummaryViewModel {
         String(format: "%.1f", value)
     }
 
-    func discordExportText(for entries: [TimeEntry], expectedHours: Double) -> String {
+    func discordExportText(for entries: [TimeEntry],
+                           expectedHours: Double,
+                           categories: [Category]) -> String {
         if let project = selectedProject {
-            return discordTextForProject(project, entries: entries)
+            return discordTextForProject(project, entries: entries, categories: categories)
         }
         return discordTextForAllProjects(entries: entries, expectedHours: expectedHours)
     }
@@ -330,7 +337,9 @@ final class SummaryViewModel {
         return (header + ["```", table, "```"]).joined(separator: "\n")
     }
 
-    private func discordTextForProject(_ project: Project, entries: [TimeEntry]) -> String {
+    private func discordTextForProject(_ project: Project,
+                                       entries: [TimeEntry],
+                                       categories: [Category]) -> String {
         let projectTotal = totalHoursForProject(project, entries: entries)
         var header: [String] = []
         header.append("**TimeTracker — \(monthYearString) — \(project.name)**")
@@ -341,9 +350,9 @@ final class SummaryViewModel {
         defer { selectedProject = previousSelection }
 
         var rows: [(category: String, task: String, hours: Double)] = []
-        for category in TaskCategory.allCases {
+        for category in categories {
             for item in taskHoursForCategory(category, entries: entries) {
-                rows.append((category.displayName, item.task.name, item.hours))
+                rows.append((category.name, item.task.name, item.hours))
             }
         }
 

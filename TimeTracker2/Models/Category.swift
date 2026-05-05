@@ -16,9 +16,8 @@ final class Category {
     var isArchived: Bool
     var creationDate: Date
 
-    // Re-enabled in Task 4 once TrackedTask gains a stored `category` relationship.
-    // @Relationship(deleteRule: .nullify, inverse: \TrackedTask.category)
-    // var tasks: [TrackedTask] = []
+    @Relationship(deleteRule: .nullify, inverse: \TrackedTask.category)
+    var tasks: [TrackedTask]
 
     init(name: String,
          colorName: String,
@@ -32,6 +31,7 @@ final class Category {
         self.order = order
         self.isArchived = isArchived
         self.creationDate = creationDate
+        self.tasks = []
     }
 }
 

@@ -108,7 +108,7 @@ final class CalendarViewModel {
         SwedishHolidays.holiday(for: date, calendar: calendar)?.name
     }
 
-    func categoriesForDate(_ date: Date, entries: [TimeEntry]) -> Set<TaskCategory> {
+    func categoriesForDate(_ date: Date, entries: [TimeEntry]) -> Set<Category> {
         let dayEntries = entriesForDate(date, entries: entries)
         return Set(dayEntries.compactMap { $0.task?.category })
     }

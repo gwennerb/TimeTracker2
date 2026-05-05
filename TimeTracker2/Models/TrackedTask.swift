@@ -2,8 +2,6 @@
 //  TrackedTask.swift
 //  TimeTracker2
 //
-//  Created by Per Bergström on 2025-12-06.
-//
 
 import Foundation
 import SwiftData
@@ -11,24 +9,55 @@ import SwiftData
 @Model
 final class TrackedTask {
     var name: String
+
+    /// Deprecated: the legacy enum raw value. Kept for one release as a migration
+    /// safety net; remove via a versioned schema migration once `category` is
+    /// confirmed populated for all installs.
     var categoryRawValue: String
+
     var creationDate: Date
     var isArchived: Bool
-    
+
+    @Relationship(deleteRule: .nullify)
+    var category: Category?
+
     @Relationship(deleteRule: .cascade, inverse: \TimeEntry.task)
     var entries: [TimeEntry]
-    
-    var category: TaskCategory {
-        get { TaskCategory(rawValue: categoryRawValue) ?? .misc }
-        set { categoryRawValue = newValue.rawValue }
-    }
-    
-    init(name: String, category: TaskCategory, creationDate: Date = Date(), isArchived: Bool = false) {
+
+    init(name: String,
+         category: Category? = nil,
+         creationDate: Date = Date(),
+         isArchived: Bool = false) {
         self.name = name
-        self.categoryRawValue = category.rawValue
+        self.categoryRawValue = category?.name ?? ""
         self.creationDate = creationDate
         self.isArchived = isArchived
+        self.category = category
         self.entries = []
+    }
+
+    /// Legacy initializer kept for tests written against the old `TaskCategory`
+    /// enum. Uses the enum's raw value to populate `categoryRawValue` so the
+    /// migration can still re-link them. Will be retired once tests adopt
+    /// the `Category` model directly.
+    convenience init(name: String,
+                     category: TaskCategory,
+                     creationDate: Date = Date(),
+                     isArchived: Bool = false) {
+        self.init(name: name, category: nil as Category?,
+                  creationDate: creationDate, isArchived: isArchived)
+        self.categoryRawValue = category.rawValue
+    }
+
+    /// Test/migration helper. Lets us construct a task whose legacy raw value is
+    /// set explicitly (including bogus values).
+    convenience init(name: String,
+                     legacyCategoryRawValue: String,
+                     creationDate: Date = Date(),
+                     isArchived: Bool = false) {
+        self.init(name: name, category: nil as Category?,
+                  creationDate: creationDate, isArchived: isArchived)
+        self.categoryRawValue = legacyCategoryRawValue
     }
 
     var lastUsedDate: Date? {
