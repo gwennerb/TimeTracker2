@@ -36,19 +36,6 @@ final class TrackedTask {
         self.entries = []
     }
 
-    /// Legacy initializer kept for tests written against the old `TaskCategory`
-    /// enum. Uses the enum's raw value to populate `categoryRawValue` so the
-    /// migration can still re-link them. Will be retired once tests adopt
-    /// the `Category` model directly.
-    convenience init(name: String,
-                     category: TaskCategory,
-                     creationDate: Date = Date(),
-                     isArchived: Bool = false) {
-        self.init(name: name, category: nil as Category?,
-                  creationDate: creationDate, isArchived: isArchived)
-        self.categoryRawValue = category.rawValue
-    }
-
     /// Test/migration helper. Lets us construct a task whose legacy raw value is
     /// set explicitly (including bogus values).
     convenience init(name: String,
