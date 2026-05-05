@@ -22,7 +22,7 @@ struct CategoryMigrationTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
 
         let descriptor = FetchDescriptor<TimeTracker2.Category>(sortBy: [SortDescriptor(\TimeTracker2.Category.order)])
         let categories = try context.fetch(descriptor)
@@ -45,7 +45,7 @@ struct CategoryMigrationTests {
         context.insert(portalTask)
         try context.save()
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
 
         #expect(appTask.category?.name == "App")
         #expect(portalTask.category?.name == "Portal")
@@ -60,7 +60,7 @@ struct CategoryMigrationTests {
         context.insert(task)
         try context.save()
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
 
         #expect(task.category?.name == "Misc")
     }
@@ -70,8 +70,8 @@ struct CategoryMigrationTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
+        CategoryMigration.run(in: context)
 
         let count = try context.fetchCount(FetchDescriptor<TimeTracker2.Category>())
         #expect(count == 4)
@@ -86,11 +86,61 @@ struct CategoryMigrationTests {
         context.insert(task)
         try context.save()
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
         let firstLink = task.category
         #expect(firstLink?.name == "App")
 
-        CategoryMigration.run(in: context, defaultsKey: nil)
+        CategoryMigration.run(in: context)
         #expect(task.category?.persistentModelID == firstLink?.persistentModelID)
+    }
+
+    @Test @MainActor
+    func unmatchedRawValueStaysNilWhenNoMiscExists() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Pre-populate user-defined categories with no "Misc". This mimics the
+        // real-world scenario where the seed step never persisted on first
+        // launch and the user created their own categories before opening Tasks.
+        let work = TimeTracker2.Category(name: "Work", colorName: "blue",
+                                         iconSymbol: "app.fill", order: 0)
+        let personal = TimeTracker2.Category(name: "Personal", colorName: "green",
+                                             iconSymbol: "globe", order: 1)
+        context.insert(work)
+        context.insert(personal)
+
+        let orphan = TrackedTask(name: "Legacy", legacyCategoryRawValue: "App")
+        context.insert(orphan)
+        try context.save()
+
+        CategoryMigration.run(in: context)
+
+        #expect(orphan.category == nil)
+        // Sanity: existing user categories must not have been clobbered.
+        let names = try context.fetch(FetchDescriptor<TimeTracker2.Category>()).map(\.name).sorted()
+        #expect(names == ["Personal", "Work"])
+    }
+
+    @Test @MainActor
+    func unmatchedRawValueStaysNilWhenMiscIsArchived() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Seed the four defaults, then archive Misc — the back-link must
+        // refuse to assign orphans to an archived row even as a fallback.
+        CategoryMigration.run(in: context)
+        let misc = try context.fetch(FetchDescriptor<TimeTracker2.Category>())
+            .first { $0.name == "Misc" }
+        #expect(misc != nil)
+        misc?.isArchived = true
+        try context.save()
+
+        let orphan = TrackedTask(name: "Legacy", legacyCategoryRawValue: "Bogus")
+        context.insert(orphan)
+        try context.save()
+
+        CategoryMigration.run(in: context)
+
+        #expect(orphan.category == nil)
     }
 }

@@ -7,20 +7,16 @@ import Foundation
 import SwiftData
 
 enum CategoryMigration {
-    nonisolated(unsafe) static let defaultsKey = "categoriesMigratedV1"
-
-    /// Seeds the four legacy categories on first launch and back-links every task
-    /// that lacks a `category` relationship. Idempotent: subsequent invocations
-    /// short-circuit on the UserDefaults flag, and even if the flag is wiped the
-    /// empty-table guard prevents duplicate seeds.
-    ///
-    /// `defaultsKey == nil` skips the UserDefaults gate (used by tests).
+    /// Seeds the four legacy categories on a store with no Category rows and
+    /// back-links every task that lacks a `category` relationship. Safe to run
+    /// on every launch: seed insertion is gated on the empty-table check, and
+    /// back-linking only touches tasks whose category is nil. Tasks whose
+    /// legacy raw value doesn't match any active category — and where no
+    /// active "Misc" category exists as a fallback — are intentionally left
+    /// nil so the user can resolve them via the Uncategorized bucket rather
+    /// than being auto-assigned to an arbitrary custom category.
     @MainActor
-    static func run(in context: ModelContext, defaultsKey: String? = CategoryMigration.defaultsKey) {
-        if let key = defaultsKey, UserDefaults.standard.bool(forKey: key) {
-            return
-        }
-
+    static func run(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<Category>())) ?? []
         let seeds = existing.isEmpty ? insertSeeds(in: context) : existing
 
@@ -29,15 +25,7 @@ enum CategoryMigration {
         do {
             try context.save()
         } catch {
-            // Discard inserted seeds and pending back-link mutations so the
-            // context matches the on-disk state. The UserDefaults flag stays
-            // unset, so the next launch retries from a clean slate.
             context.rollback()
-            return
-        }
-
-        if let key = defaultsKey {
-            UserDefaults.standard.set(true, forKey: key)
         }
     }
 
@@ -62,8 +50,12 @@ enum CategoryMigration {
     }
 
     private static func backLinkTasks(seeds: [Category], in context: ModelContext) {
-        let byName = Dictionary(uniqueKeysWithValues: seeds.map { ($0.name, $0) })
-        let misc = byName["Misc"] ?? seeds.first
+        // Match against active categories only — assigning a legacy task to an
+        // archived row would silently hide it. Use a uniquing initialiser so a
+        // duplicate-name pair (allowed when one is archived) doesn't trap.
+        let active = seeds.filter { !$0.isArchived }
+        let byName = Dictionary(active.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        let misc = byName["Misc"]
 
         let descriptor = FetchDescriptor<TrackedTask>(
             predicate: #Predicate { $0.category == nil }
@@ -71,8 +63,13 @@ enum CategoryMigration {
         let unlinked = (try? context.fetch(descriptor)) ?? []
 
         for task in unlinked {
-            let target = byName[task.categoryRawValue] ?? misc
-            task.category = target
+            // Leave the task nil if neither an exact-name nor Misc fallback exists.
+            // The Tasks tab surfaces nil-category tasks under "Uncategorized" so the
+            // user can fix them by hand instead of being auto-assigned to a random
+            // custom category.
+            if let target = byName[task.categoryRawValue] ?? misc {
+                task.category = target
+            }
         }
     }
 }

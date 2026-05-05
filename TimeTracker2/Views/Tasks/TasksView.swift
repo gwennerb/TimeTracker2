@@ -34,10 +34,20 @@ struct TasksView: View {
             .sorted { $0.name < $1.name }
     }
 
+    private var uncategorizedTasks: [TrackedTask] {
+        activeTasks
+            .filter { $0.category == nil }
+            .sorted { $0.name < $1.name }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 viewHeader
+
+                if !uncategorizedTasks.isEmpty {
+                    uncategorizedSection
+                }
 
                 ForEach(activeCategories) { category in
                     let categoryTasks = tasks(for: category, includeArchivedTasks: false)
@@ -91,6 +101,34 @@ struct TasksView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var uncategorizedSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Label("Uncategorized", systemImage: "exclamationmark.triangle")
+                    .font(.headline)
+                    .foregroundStyle(.orange)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+
+            Text("These tasks aren't linked to a category. Tap a task to assign one.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                ForEach(uncategorizedTasks) { task in
+                    taskRow(task: task, archivedCategory: false)
+
+                    if task.id != uncategorizedTasks.last?.id {
+                        Divider().padding(.leading, 36)
+                    }
+                }
+            }
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 
     private func categorySection(category: Category,
